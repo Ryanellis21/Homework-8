@@ -30,7 +30,7 @@ class PumpCurve_GUI_Class(Ui_Form, qtw.QWidget):  #class for PumpCurve_GUI inher
         #add the canvas to the form (can't be done directly in qtdesigner)
         self.GL_Output.addWidget(self.canvas,5,0,1,4)
 
-        self.myPump=Pump_Controller() #create a pump controller object
+        self.myPump=#JES Missing Code #create a pump controller object
         self.setViewWidgets() #pass along widgets to myPump for diaplay
 
         #show the widget
