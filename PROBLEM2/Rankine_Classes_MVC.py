@@ -1,29 +1,41 @@
 # region imports
-import math
-from Calc_state import *
-from UnitConversions import UnitConverter as UC
-import numpy as np
-from matplotlib import pyplot as plt
-from copy import deepcopy as dc
-# these imports are necessary for drawing a matplot lib graph on my GUI
-# no simple widget for this exists in QT Designer, so I have to add the widget in code.
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
+import math  # Provides access to mathematical functions (e.g., sin, cos, sqrt).
+from Calc_state import *  # Imports functions and classes for calculating thermodynamic state properties.
+from UnitConversions import UnitConverter as UC  # For performing unit conversions, aliased as UC for simplicity.
+import numpy as np  # Used for numerical operations, array manipulations.
+from matplotlib import pyplot as plt  # For plotting graphs.
+from copy import deepcopy as dc  # To create deep copies of objects, ensuring no unintended shared references.
+
+# These imports are required for embedding matplotlib graphs into a Qt-based graphical user interface (GUI).
+# Since Qt Designer does not offer a direct widget for matplotlib, it needs to be manually integrated.
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg  # Embeds matplotlib into Qt widgets.
+from matplotlib.figure import Figure  # Represents a figure in matplotlib.
 #endregion
 
 # region class definitions
-class rankineModel():
+class rankineModel:
     def __init__(self):
-        '''
-        Constructor for rankine power cycle data (in the Model-View-Controller design pattern).  This class
-        is for storing data only.  The Controller class should update the model depending on input from the user.
-        The View class should display the model data depending on the desired output.
-        :param p_low: the low pressure isobar for the cycle in kPa
-        :param p_high: the high pressure isobar for the cycle in kPa
-        :param t_high: optional temperature for State1 (turbine inlet) in degrees C
-        :param eff_turbine: isentropic efficiency of the turbine
-        :param name: a convenient name
-        '''
+        """
+        Initializes a model for a Rankine power cycle. This class is designed according to the Model component
+        of the Model-View-Controller (MVC) architecture, focusing solely on data storage. The Controller component
+        is responsible for modifying this model based on user input, whereas the View component displays the data.
+
+        Attributes:
+            p_low (float): Low pressure isobar for the cycle, in kPa. Default is None.
+            p_high (float): High pressure isobar for the cycle, in kPa. Default is None.
+            t_high (float): Optional temperature at turbine inlet (State 1), in degrees C. Default is None.
+            name (str): A label for the cycle. Default is None.
+            efficiency (float): The overall cycle efficiency. Default is None.
+            turbine_eff (float): Isentropic efficiency of the turbine. Default is None.
+            turbine_work (float): Work done by the turbine, in the same units as heat_added. Default is None.
+            pump_work (float): Work required by the pump, in the same units as heat_added. Default is None.
+            heat_added (float): Heat added during the cycle, typically in kJ/kg. Default is None.
+            steam (Steam_SI): An object for calculating steam properties. Instantiated by default.
+            state1, state2s, state2, state3, state4 (stateProps): Objects representing key thermodynamic states in the cycle.
+            SI (bool): True if using SI units, False for English units. Affects pressure and temperature inputs.
+            satLiqPlotData, satVapPlotData, upperCurve, lowerCurve (StateDataForPlotting): Containers for data useful in plotting.
+        """
+        # Initialize all attributes to None or appropriate default values.
         self.p_low = None
         self.p_high = None
         self.t_high = None
@@ -33,199 +45,233 @@ class rankineModel():
         self.turbine_work = None
         self.pump_work = None
         self.heat_added = None
-        self.steam = Steam_SI()  # Instantiate a steam object for calculating state
-        # Initialize the states as stateProps objects (i.e., stateProperties)
+        # Instantiate a steam object and initialize state properties for key cycle states.
+        self.steam = Steam_SI()
         self.state1 = stateProps()
         self.state2s = stateProps()
         self.state2 = stateProps()
         self.state3 = stateProps()
         self.state4 = stateProps()
-        self.SI = True  # If False, convert pressures from psi to kPa and T from F to C for inputs
-        # the following are a place to store data for plotting
+        # Set SI unit flag and prepare containers for plotting data.
+        self.SI = True
         self.satLiqPlotData = StateDataForPlotting()
         self.satVapPlotData = StateDataForPlotting()
         self.upperCurve = StateDataForPlotting()
         self.lowerCurve = StateDataForPlotting()
 
-
-class rankineView():
+class rankineView:
     def __init__(self):
         """
-        Empty constructor by design
+        Constructor for the rankineView class. This class represents the View in the MVC architecture,
+        handling the graphical user interface components. The constructor is intentionally left empty
+        because the initialization of this class doesn't require any specific setup. The GUI components
+        are set up externally and passed to this class through other methods.
         """
 
     def setWidgets(self, *args):
-        # create class variables for the input widgets
-        self.rb_SI, self.le_PHigh, self.le_PLow, self.le_TurbineInletCondition, self.rdo_Quality, self.le_TurbineEff, self.cmb_XAxis, self.cmb_YAxis, self.chk_logX, self.chk_logY = args[0]
-        #create class variables for the display widgets
-        self.lbl_PHigh, self.lbl_PLow, self.lbl_SatPropLow, self.lbl_SatPropHigh, self.lbl_TurbineInletCondition, self.lbl_H1, self.lbl_H1Units, self.lbl_H2, self.lbl_H2Units, self.lbl_H3, self.lbl_H3Units, self.lbl_H4, self.lbl_H4Units, self.lbl_TurbineWork, self.lbl_TurbineWorkUnits, self.lbl_PumpWork, self.lbl_PumpWorkUnits, self.lbl_HeatAdded, self.lbl_HeatAddedUnits, self.lbl_ThermalEfficiency, self.canvas, self.figure, self.ax = args[1]
+        """
+        Initializes class variables to reference the GUI widgets. This method categorizes widgets into
+        input and display widgets for further manipulation.
+
+        :param args: A tuple containing two lists:
+                     args[0] - A list of input widget references.
+                     args[1] - A list of display widget references.
+        """
+        # Assign input widget references to class variables for easy access.
+        (self.rb_SI, self.le_PHigh, self.le_PLow, self.le_TurbineInletCondition,
+         self.rdo_Quality, self.le_TurbineEff, self.cmb_XAxis, self.cmb_YAxis,
+         self.chk_logX, self.chk_logY) = args[0]
+
+        # Assign display widget references to class variables for easy access.
+        (self.lbl_PHigh, self.lbl_PLow, self.lbl_SatPropLow, self.lbl_SatPropHigh,
+         self.lbl_TurbineInletCondition, self.lbl_H1, self.lbl_H1Units, self.lbl_H2,
+         self.lbl_H2Units, self.lbl_H3, self.lbl_H3Units, self.lbl_H4, self.lbl_H4Units,
+         self.lbl_TurbineWork, self.lbl_TurbineWorkUnits, self.lbl_PumpWork,
+         self.lbl_PumpWorkUnits, self.lbl_HeatAdded, self.lbl_HeatAddedUnits,
+         self.lbl_ThermalEfficiency, self.canvas, self.figure, self.ax) = args[1]
 
     def selectQualityOrTHigh(self, Model=None):
         """
-        Action to take when selecting one of the radio buttons for Quality or THigh
-        :return:
+        Handles the selection between Quality (x) and high temperature (THigh) for the turbine inlet
+        condition. It updates the GUI accordingly and recalculates the state properties if necessary.
+
+        :param Model: The Rankine cycle model instance to query or update based on the selection. This
+                      allows for direct interaction with the model to fetch or modify cycle parameters.
         """
-        # region Code for P1.1
+        # Check the system of units selected by the user (SI or English units).
         SI = self.rb_SI.isChecked()
+
+        # If Quality is selected, set the Turbine Inlet Condition field to 1.0 and disable it.
         if self.rdo_Quality.isChecked():
             self.le_TurbineInletCondition.setText("1.0")
             self.le_TurbineInletCondition.setEnabled(False)
         else:
+            # If THigh is selected, enable the field and update its value based on the saturated temperature at PHigh.
+            # Convert the pressure if needed and fetch the corresponding saturated temperature.
             PCF = 1 if SI else UC.psi_to_bar
-            satPHigh = Model.steam.getsatProps_p(float(self.le_PHigh.text() * PCF))
+            satPHigh = Model.steam.getsatProps_p(float(self.le_PHigh.text()) * PCF)
             Tsat = satPHigh.tsat
             Tsat = Tsat if SI else UC.C_to_F(Tsat)
             CurrentT = float(self.le_TurbineInletCondition.text())
-            CurrentT = max(CurrentT, Tsat)
+            CurrentT = max(CurrentT, Tsat)  # Ensure the temperature is not below saturation.
             self.le_TurbineInletCondition.setText("{:0.2f}".format(CurrentT))
             self.le_TurbineInletCondition.setEnabled(True)
-        # endregion
+
+        # Update the label for the Turbine Inlet Condition to reflect the current selection.
         x = self.rdo_Quality.isChecked()
         self.lbl_TurbineInletCondition.setText(
-            ("Turbine Inlet: {}{} =".format('x' if x else 'THigh', '' if x else ('(C)' if SI else '(F)'))))
+            "Turbine Inlet: {}{} =".format('x' if x else 'THigh', '' if x else ('(C)' if SI else '(F)')))
 
-    def setNewPHigh(self, Model=None):
-        """
-                 This function checks the self.rb_SI.isChecked() to see which units are used.
-                 Then, it sets the text of lbl_SatPropHigh using SatPropsIsobar(float(self.le_PHigh.text())*PCF, SI=SI).txtOut
-                 here, PCF is the pressure conversion factor
-                 finally, we need to call the function self.SelectQualityOrTHigh()
-                 :return:
-                 """
-        SI = self.rb_SI.isChecked()
-        PCF = 1 if SI else UC.psi_to_bar
-        satProp = Model.steam.getsatProps_p(float(self.le_PHigh.text()) * PCF)
-        self.lbl_SatPropHigh.setText(satProp.getTextOutput(SI=SI))
-        self.selectQualityOrTHigh(Model)
 
-    def setNewPLow(self, Model=None):
-        SI = self.rb_SI.isChecked()
-        PCF = 1 if SI else UC.psi_to_bar
-        satProp = Model.steam.getsatProps_p(float(self.le_PLow.text()) * PCF)
-        self.lbl_SatPropLow.setText(satProp.getTextOutput(SI=SI))
+   def setNewPHigh(self, Model=None):
+    """
+    Updates the displayed high saturation properties based on the high pressure value entered by the user.
+    This function adapts the display to reflect changes in units (SI or English) and recalculates the
+    saturation properties for the new pressure.
 
-    def outputToGUI(self, Model=None):
-        # unpack the args
-        if Model.state1 is None:  # means the cycle has not been evaluated yet
-            return
-        # update the line edits and labels
-        HCF = 1 if Model.SI else UC.kJperkg_to_BTUperlb  # Enthalpy conversion factor (HCF)
-        self.lbl_H1.setText("{:0.2f}".format(Model.state1.h * HCF))
-        self.lbl_H2.setText("{:0.2f}".format(Model.state2.h * HCF))
-        self.lbl_H3.setText("{:0.2f}".format(Model.state3.h * HCF))
-        self.lbl_H4.setText("{:0.2f}".format(Model.state4.h * HCF))
-        self.lbl_TurbineWork.setText("{:0.2f}".format(Model.turbine_work * HCF))
-        self.lbl_PumpWork.setText("{:0.2f}".format(Model.pump_work * HCF))
-        self.lbl_HeatAdded.setText("{:0.2f}".format(Model.heat_added * HCF))
-        self.lbl_ThermalEfficiency.setText("{:0.2f}".format(Model.efficiency))
-        satPropsLow = Model.steam.getsatProps_p(p=Model.p_low)
-        satPropsHigh = Model.steam.getsatProps_p(p=Model.p_high)
-        self.lbl_SatPropLow.setText(satPropsLow.getTextOutput(SI=Model.SI))
-        self.lbl_SatPropHigh.setText(satPropsHigh.getTextOutput(SI=Model.SI))
+    :param Model: The Rankine cycle model instance, used to access the steam property calculations.
+    """
+    # Determine if the system is using SI units based on the GUI checkbox.
+    SI = self.rb_SI.isChecked()
+    # Define the pressure conversion factor based on the unit system.
+    PCF = 1 if SI else UC.psi_to_bar
+    # Retrieve the saturation properties for the new high pressure value.
+    satProp = Model.steam.getsatProps_p(float(self.le_PHigh.text()) * PCF)
+    # Update the GUI label to show the new saturation properties.
+    self.lbl_SatPropHigh.setText(satProp.getTextOutput(SI=SI))
+    # Trigger any additional GUI updates needed due to the change in high pressure.
+    self.selectQualityOrTHigh(Model)
 
-        # update the plot
-        self.plot_cycle_XY(Model=Model)
+def setNewPLow(self, Model=None):
+    """
+    Updates the displayed low saturation properties based on the low pressure value entered by the user.
+    Similar to setNewPHigh, it adjusts for unit differences and recalculates saturation properties.
 
-    def updateUnits(self, Model=None):
-        """
-        Updates the units on the GUI to match choice of SI or English
-        :param Model:  a reference to the model
-        :return:
-        """
-        # Step 0. update the outputs
-        self.outputToGUI(Model=Model)
-        # Update units displayed on labels
-        # Step 1. Update pressures for PHigh and PLow
-        pCF = 1 if Model.SI else UC.bar_to_psi
-        self.le_PHigh.setText("{:0.2f}".format(pCF * Model.p_high))
-        self.le_PLow.setText("{:0.2f}".format(pCF * Model.p_low))
-        # Step 2. Update THigh if it is not None
-        if not self.rdo_Quality.isChecked():
-            T = float(self.le_TurbineInletCondition.text())
-            T = UC.F_to_C(T) if Model.SI else UC.C_to_F(T)
-            TUnits = "C" if Model.SI else "F"
-            self.le_TurbineInletCondition.setText("{:0.2f}".format(T))
-            self.lbl_TurbineInletCondition.setText("Turbine Inlet: THigh ({}):".format(TUnits))
-        # Step 3. Update the units for labels
-        self.lbl_PHigh.setText("P High ({})".format('bar' if Model.SI else 'psi'))
-        self.lbl_PLow.setText("P Low ({})".format('bar' if Model.SI else 'psi'))
-        HUnits = "kJ/kg" if Model.SI else "BTU/lb"
-        self.lbl_H1Units.setText(HUnits)
-        self.lbl_H2Units.setText(HUnits)
-        self.lbl_H3Units.setText(HUnits)
-        self.lbl_H4Units.setText(HUnits)
-        self.lbl_TurbineWorkUnits.setText(HUnits)
-        self.lbl_PumpWorkUnits.setText(HUnits)
-        self.lbl_HeatAddedUnits.setText(HUnits)
+    :param Model: The Rankine cycle model instance for accessing steam properties.
+    """
+    # Check if SI units are being used.
+    SI = self.rb_SI.isChecked()
+    # Define pressure conversion factor based on unit system.
+    PCF = 1 if SI else UC.psi_to_bar
+    # Retrieve and display the saturation properties for the new low pressure value.
+    satProp = Model.steam.getsatProps_p(float(self.le_PLow.text()) * PCF)
+    self.lbl_SatPropLow.setText(satProp.getTextOutput(SI=SI))
+
+def outputToGUI(self, Model=None):
+    """
+    Outputs the current state of the Rankine cycle model to the GUI. This includes updating
+    enthalpy values for key states, work done by the turbine and pump, heat added to the cycle,
+    and the overall thermal efficiency. Additionally, updates the plot with the new cycle data.
+
+    :param Model: The Rankine cycle model instance containing the current state and calculations.
+    """
+    # Early exit if the cycle has not been evaluated yet.
+    if Model.state1 is None:
+        return
+    
+    # Determine the enthalpy conversion factor based on the system of units.
+    HCF = 1 if Model.SI else UC.kJperkg_to_BTUperlb
+    # Update GUI labels with the latest model data, converted to the appropriate units.
+    self.lbl_H1.setText("{:0.2f}".format(Model.state1.h * HCF))
+    self.lbl_H2.setText("{:0.2f}".format(Model.state2.h * HCF))
+    self.lbl_H3.setText("{:0.2f}".format(Model.state3.h * HCF))
+    self.lbl_H4.setText("{:0.2f}".format(Model.state4.h * HCF))
+    self.lbl_TurbineWork.setText("{:0.2f}".format(Model.turbine_work * HCF))
+    self.lbl_PumpWork.setText("{:0.2f}".format(Model.pump_work * HCF))
+    self.lbl_HeatAdded.setText("{:0.2f}".format(Model.heat_added * HCF))
+    self.lbl_ThermalEfficiency.setText("{:0.2f}".format(Model.efficiency))
+    # Also, update saturation properties labels for both high and low pressures.
+    satPropsLow = Model.steam.getsatProps_p(Model.p_low)
+    satPropsHigh = Model.steam.getsatProps_p(Model.p_high)
+    self.lbl_SatPropLow.setText(satPropsLow.getTextOutput(SI=Model.SI))
+    self.lbl_SatPropHigh.setText(satPropsHigh.getTextOutput(SI=Model.SI))
+    
+    # Finally, update the cycle plot with the latest data.
+    self.plot_cycle_XY(Model=Model)
+
+   def updateUnits(self, Model=None):
+    """
+    Updates the units displayed in the GUI based on the current selection between SI and English units.
+    This includes converting and displaying the pressures, temperatures, and enthalpies in the chosen units.
+
+    :param Model: An instance of the Rankine cycle model containing current state and configuration.
+    """
+    # Refresh the GUI to ensure all displayed values are current.
+    self.outputToGUI(Model=Model)
+
+    # Determine the conversion factor for pressure based on selected units.
+    pCF = 1 if Model.SI else UC.bar_to_psi
+    # Update displayed pressures with the correct units and converted values.
+    self.le_PHigh.setText("{:0.2f}".format(pCF * Model.p_high))
+    self.le_PLow.setText("{:0.2f}".format(pCF * Model.p_low))
+
+    # If turbine inlet condition is based on temperature (THigh), convert and update this value.
+    if not self.rdo_Quality.isChecked():
+        T = float(self.le_TurbineInletCondition.text())
+        T = UC.F_to_C(T) if Model.SI else UC.C_to_F(T)
+        TUnits = "C" if Model.SI else "F"
+        self.le_TurbineInletCondition.setText("{:0.2f}".format(T))
+        self.lbl_TurbineInletCondition.setText(f"Turbine Inlet: THigh ({TUnits}):")
+
+    # Update labels to reflect the current unit system.
+    self.lbl_PHigh.setText(f"P High ({'bar' if Model.SI else 'psi'})")
+    self.lbl_PLow.setText(f"P Low ({'bar' if Model.SI else 'psi'})")
+    HUnits = "kJ/kg" if Model.SI else "BTU/lb"
+    # Apply unit updates to all relevant labels.
+    for label in [self.lbl_H1Units, self.lbl_H2Units, self.lbl_H3Units, self.lbl_H4Units,
+                  self.lbl_TurbineWorkUnits, self.lbl_PumpWorkUnits, self.lbl_HeatAddedUnits]:
+        label.setText(HUnits)
+
 
     def print_summary(self, Model=None):
-        """
-        Prints to CLI.
-        :param Model: a rankineModel object
-        :return: nothing
-        """
-        if Model.efficiency == None:
-            Model.calc_efficiency()
-        print('Cycle Summary for: ', Model.name)
-        print('\tEfficiency: {:0.3f}%'.format(Model.efficiency))
-        print('\tTurbine Eff:  {:0.2f}'.format(Model.turbine_eff))
-        print('\tTurbine Work: {:0.3f} kJ/kg'.format(Model.turbine_work))
-        print('\tPump Work: {:0.3f} kJ/kg'.format(Model.pump_work))
-        print('\tHeat Added: {:0.3f} kJ/kg'.format(Model.heat_added))
-        Model.state1.print()
-        Model.state2.print()
-        Model.state3.print()
-        Model.state4.print()
+    """
+    Outputs a summary of the Rankine cycle's performance metrics to the command line interface. This includes
+    efficiency, work done by the turbine and pump, and the heat added, along with the state properties at key points.
+
+    :param Model: The Rankine cycle model instance to pull data from.
+    """
+    # Calculate efficiency if not already done.
+    if Model.efficiency is None:
+        Model.calc_efficiency()
+    
+    # Print the cycle summary with formatted values for clarity.
+    print(f'Cycle Summary for: {Model.name}')
+    print(f'\tEfficiency: {Model.efficiency:.3f}%')
+    print(f'\tTurbine Eff:  {Model.turbine_eff:.2f}')
+    print(f'\tTurbine Work: {Model.turbine_work:.3f} kJ/kg')
+    print(f'\tPump Work: {Model.pump_work:.3f} kJ/kg')
+    print(f'\tHeat Added: {Model.heat_added:.3f} kJ/kg')
+    # Print state properties for each key state in the cycle.
+    for state in [Model.state1, Model.state2, Model.state3, Model.state4]:
+        state.print()
+
 
     def plot_cycle_TS(self, axObj=None, Model=None):
-        """
-        I want to plot the Rankine cycle on T-S coordinates along with the vapor dome and shading in the cycle.
-        I notice there are several lines on the plot:
-        saturated liquid T(s) colored blue
-        saturated vapor T(s) colored red
-        The high and low isobars and lines connecting state 1 to 2, and 3 to saturated liquid at phigh
-        step 1:  build data for saturated liquid line
-        step 2:  build data for saturated vapor line
-        step 3:  build data between state 3 and sat liquid at p_high
-        step 4:  build data between sat liquid at p_high and state 1
-        step 5:  build data between state 1 and state 2
-        step 6:  build data between state 2 and state 3
-        step 7:  put together data from 3,4,5 for top line and build bottom line
-        step 8:  make and decorate plot
+    """
+    Plots the Rankine cycle on T-S coordinates, including the vapor dome and the process paths between key states.
+    The plot can either be displayed using pyplot directly or drawn on a pre-existing Matplotlib axes object.
 
-        Note:  will plot using pyplot if axObj is None else just returns
+    :param axObj: Optional. A Matplotlib axes object to draw the plot on. If None, a new plot will be created.
+    :param Model: The Rankine cycle model instance containing state properties and other relevant data.
+    """
+    # Configure plot settings based on selected unit system.
+    SI = Model.SI
+    steam = Model.steam  # Shortcut to the steam property calculations in the model.
 
-        :param axObj:  if None, used plt.subplot else a MatplotLib axes object.
-        :return:
-        """
-        SI = Model.SI
-        steam = Model.steam
-        # region step 1&2:
-        ts, ps, hfs, hgs, sfs, sgs, vfs, vgs = np.loadtxt('sat_water_table.txt', skiprows=1,
-                                                          unpack=True)  # use np.loadtxt to read the saturated properties
-        ax = plt.subplot() if axObj is None else axObj
+    # Load saturation properties to plot the vapor dome.
+    ts, ps, hfs, hgs, sfs, sgs, vfs, vgs = np.loadtxt('sat_water_table.txt', skiprows=1, unpack=True)
+    ax = plt.subplot() if axObj is None else axObj  # Determine the plotting context.
 
-        hCF = 1 if Model.SI else UC.kJperkg_to_BTUperlb
-        pCF = 1 if Model.SI else UC.kpa_to_psi
-        sCF = 1 if Model.SI else UC.kJperkgK_to_BTUperlbR
-        vCF = 1 if Model.SI else UC.kgperm3_to_lbperft3
+    # Apply unit conversions to the saturation properties based on the selected unit system.
+    unitConversions = [1 if SI else conversion for conversion in (UC.kJperkg_to_BTUperlb, UC.kpa_to_psi, UC.kJperkgK_to_BTUperlbR, UC.kgperm3_to_lbperft3)]
+    hfs, hgs, sfs, sgs, vfs, vgs, ps = [prop * conversion for prop, conversion in zip((hfs, hgs, sfs, sgs, vfs, vgs, ps), unitConversions)]
+    ts = [t if SI else UC.C_to_F(t) for t in ts]  # Convert temperature if necessary.
 
-        sfs *= sCF
-        sgs *= sCF
-        hfs *= hCF
-        hgs *= hCF
-        vfs *= vCF
-        vgs *= vCF
-        ps *= pCF
-        ts = [t if Model.SI else UC.C_to_F(t) for t in ts]
+    # Plot saturated liquid and vapor lines to represent the vapor dome.
+    ax.plot(sfs, ts, color='blue')  # Saturated liquid line.
+    ax.plot(sgs, ts, color='red')   # Saturated vapor line.
+    # Additional steps would involve plotting the process paths and annotating the plot.
 
-        xfsat = sfs
-        yfsat = ts
-        xgsat = sgs
-        ygsat = ts
-
-        ax.plot(xfsat, yfsat, color='blue')
-        ax.plot(xgsat, ygsat, color='red')
         # endregion
 
         # step 3:  I'll just make a straight line between state3 and state3p
@@ -391,87 +437,122 @@ class rankineView():
 class rankineController():
     def __init__(self, *args):
         """
-        Create rankineModel object.  The rankineController class updates the model based on user input
-        and updates the rankineView as well
-        :param *args: a tuple containing widgets that get updated in the View
-        """
-        self.Model= rankineModel()  # In MVC pattern, the controller should hold a reference to the model
-        self.View= rankineView()  # In MVC pattern, the controller should hold a reference to the view
-        self.IW=args[0]  # an array of widgets that are for user input
-        self.DW=args[1]  # an array of widgets that are for display
-        self.View.setWidgets(self.IW, self.DW) # call the setWidgets function of the view with self.IW and self.DW as arguments (see unpacking)
+        Initializes the controller for the Rankine cycle application, following the Model-View-Controller (MVC) pattern.
+        This controller is responsible for creating the model and view components, linking them, and handling the flow of data
+        between the user interface and the model based on user interactions.
 
-        self.buildVaporDomeData()
+        :param *args: Expected to receive two tuples/lists as arguments:
+                      - The first contains widgets related to user inputs.
+                      - The second contains widgets used for displaying outputs.
+        """
+        self.Model = rankineModel()  # Initialize the Rankine cycle model.
+        self.View = rankineView()    # Initialize the view component for the GUI.
+        self.IW = args[0]  # Input Widgets: A collection of widgets that receive user input.
+        self.DW = args[1]  # Display Widgets: A collection of widgets used to display information to the user.
+        self.View.setWidgets(self.IW, self.DW)  # Setup the view with references to the input and display widgets.
+
+        self.buildVaporDomeData()  # Precompute data for the vapor dome, used in T-S diagrams.
 
     def updateModel(self):
         """
-        I'm expecting a tuple of input widgets from the GUI.  Read and apply them here.
-        :param args: a tuple of input widgets, other arguments such as SI or ENG
-        :return: nothing
+        Updates the Rankine cycle model with new parameters based on the current state of the input widgets.
+        This includes reading the values for high and low pressures, the turbine inlet temperature or quality,
+        and the isentropic efficiency of the turbine. After updating the model, it recalculates the cycle efficiency
+        and updates the view to reflect the new state of the model.
         """
-        #read from the input widgets
-        self.Model.SI=self.View.rb_SI.isChecked()
+        # Determine the system of units based on the GUI state and set the model accordingly.
+        self.Model.SI = self.View.rb_SI.isChecked()
 
-        #update the model
-        #$UNITS$ since inputs can be SI or English, I need to convert to SI here for pressures and temperature
-        PCF=1 if self.Model.SI else UC.psi_to_bar #$UNITS$ input is bar for SI and psi for English
-        self.Model.p_high = float(self.View.le_PHigh.text()) * PCF  # get the high pressure isobar in kPa
-        self.Model.p_low = float(self.View.le_PLow.text()) * PCF  # get the low pressure isobar in kPa
-        T=float(self.View.le_TurbineInletCondition.text()) #$UNITS$
-        self.Model.t_high = None if self.View.rdo_Quality.isChecked() else (T if self.Model.SI else UC.F_to_C(T)) #$UNITS$
+        # Convert input values from the GUI to SI units if necessary before updating the model.
+        PCF = 1 if self.Model.SI else UC.psi_to_bar  # Pressure Conversion Factor: Adjusts based on selected units.
+        self.Model.p_high = float(self.View.le_PHigh.text()) * PCF  # Update high pressure in the model.
+        self.Model.p_low = float(self.View.le_PLow.text()) * PCF    # Update low pressure in the model.
+        
+        # Update turbine inlet condition: Temperature if specified, or quality (x=1) by default.
+        T = float(self.View.le_TurbineInletCondition.text())  # Turbine inlet temperature or quality.
+        self.Model.t_high = None if self.View.rdo_Quality.isChecked() else (T if self.Model.SI else UC.F_to_C(T))
+        
+        # Update turbine isentropic efficiency based on user input.
         self.Model.turbine_eff = float(self.View.le_TurbineEff.text())
-        # do the calculation
+
+        # Recalculate cycle efficiency with new parameters and update the view.
         self.calc_efficiency()
         self.updateView()
 
+
     def updateUnits(self):
-        # Switching units should not change the model, but should update the view
-        self.Model.SI = self.View.rb_SI.isChecked()
-        self.View.updateUnits(Model=self.Model)
-        pass
+    """
+    Updates the unit system (SI or English) in the model based on the current selection in the view,
+    and then instructs the view to refresh all unit-dependent displays. This method ensures that
+    changing the units immediately reflects across all relevant GUI components without altering
+    the underlying model data.
+    """
+    # Update the model's unit flag based on the GUI selection.
+    self.Model.SI = self.View.rb_SI.isChecked()
+    # Call the view's method to update all GUI elements to display in the correct units.
+    self.View.updateUnits(Model=self.Model)
 
-    def selectQualityOrTHigh(self):
-        self.View.selectQualityOrTHigh(self.Model)
+def selectQualityOrTHigh(self):
+    """
+    Triggers the view to update its display based on the selection between specifying the turbine
+    inlet condition by quality or temperature. This method facilitates dynamic updates to the
+    GUI in response to user interaction.
+    """
+    # Delegate to the view the task of adjusting GUI components for the quality/temperature selection.
+    self.View.selectQualityOrTHigh(self.Model)
 
-    def setNewPHigh(self):
-        self.View.setNewPHigh(self.Model)
+def setNewPHigh(self):
+    """
+    Informs the view to update its display based on a new high pressure value specified by the user.
+    This is part of handling dynamic user inputs to adjust the simulation parameters.
+    """
+    # Trigger an update in the view to reflect the new high pressure setting.
+    self.View.setNewPHigh(self.Model)
 
-    def setNewPLow(self):
-        self.View.setNewPLow(self.Model)
+def setNewPLow(self):
+    """
+    Instructs the view to update its display to accommodate a new low pressure value input by the user.
+    This method allows for real-time adjustments to simulation parameters through the GUI.
+    """
+    # Notify the view to update its elements to show the new low pressure setting.
+    self.View.setNewPLow(self.Model)
 
-    def calc_efficiency(self):
-        """
-        I've modified this on 4/15/2022 to use a single SI_Steam object that is held in the model for calculating
-        various states along the path of the Rankine cycle.  I use the getState function to retrieve a deep copy of
-        a stateProps object.
-        :return:
-        """
-        steam = self.Model.steam
+def calc_efficiency(self):
+    """
+    Calculates the efficiency of the Rankine cycle based on current model parameters. This involves
+    computing state properties at key points in the cycle (turbine inlet, turbine exit, pump inlet,
+    and pump exit) and using these to calculate work done by the turbine, work required by the pump,
+    and heat added to the cycle.
 
-        # calculate the 4 states
-        # state 1: turbine inlet (p_high, t_high) superheated or saturated vapor
-        if (self.Model.t_high == None):
-            self.Model.state1 = steam.getState(P=self.Model.p_high, x=1.0, name='Turbine Inlet')
-        else:
-            self.Model.state1 = steam.getState(P=self.Model.p_high, T=self.Model.t_high, name='Turbine Inlet')
-        # state 2: turbine exit (p_low, s=s_turbine inlet) two-phase
-        self.Model.state2s = steam.getState(P=self.Model.p_low, s=self.Model.state1.s, name="Turbine Exit")
-        if self.Model.turbine_eff < 1.0:  # eff=(h1-h2)/(h1-h2s) -> h2=h1-eff(h1-h2s)
-            h2 = self.Model.state1.h - self.Model.turbine_eff * (self.Model.state1.h - self.Model.state2s.h)
-            self.Model.state2 = steam.getState(P=self.Model.p_low, h=h2, name="Turbine Exit")
-        else:
-            self.Model.state2 = self.Model.state2s
-        # state 3: pump inlet (p_low, x=0) saturated liquid
-        self.Model.state3 = steam.getState(P=self.Model.p_low, x=0, name='Pump Inlet')
-        # state 4: pump exit (p_high,s=s_pump_inlet) typically sub-cooled, but estimate as saturated liquid
-        self.Model.state4 = steam.getState(P=self.Model.p_high, s=self.Model.state3.s, name='Pump Exit')
+    The method uses a single instance of a steam properties object (held within the model) to
+    perform these calculations, ensuring consistency and reusability of the steam properties data.
 
-        self.Model.turbine_work = self.Model.state1.h - self.Model.state2.h  # calculate turbine work
-        self.Model.pump_work = self.Model.state4.h - self.Model.state3.h  # calculate pump work
-        self.Model.heat_added = self.Model.state1.h - self.Model.state4.h  # calculate heat added
-        self.Model.efficiency = 100.0 * (self.Model.turbine_work - self.Model.pump_work) / self.Model.heat_added
-        return self.Model.efficiency
+    :return: The calculated efficiency of the Rankine cycle as a percentage.
+    """
+    steam = self.Model.steam  # Reference to the steam object for property calculations.
 
+    # Determine state properties at key points in the cycle based on model inputs.
+    # State 1: Turbine inlet. Could be superheated or saturated vapor.
+    self.Model.state1 = steam.getState(P=self.Model.p_high, x=1.0 if self.Model.t_high is None else None, T=self.Model.t_high, name='Turbine Inlet')
+    
+    # State 2: Turbine exit. Calculated for isentropic and actual conditions based on turbine efficiency.
+    self.Model.state2s = steam.getState(P=self.Model.p_low, s=self.Model.state1.s, name="Turbine Exit")
+    h2 = self.Model.state1.h - self.Model.turbine_eff * (self.Model.state1.h - self.Model.state2s.h) if self.Model.turbine_eff < 1.0 else None
+    self.Model.state2 = steam.getState(P=self.Model.p_low, h=h2, name="Turbine Exit") if h2 is not None else self.Model.state2s
+    
+    # State 3: Pump inlet. Saturated liquid at low pressure.
+    self.Model.state3 = steam.getState(P=self.Model.p_low, x=0, name='Pump Inlet')
+    
+    # State 4: Pump exit. Calculated as saturated liquid at high pressure, assuming isentropic compression.
+    self.Model.state4 = steam.getState(P=self.Model.p_high, s=self.Model.state3.s, name='Pump Exit')
+
+    # Perform efficiency calculations.
+    self.Model.turbine_work = self.Model.state1.h - self.Model.state2.h
+    self.Model.pump_work = self.Model.state4.h - self.Model.state3.h
+    self.Model.heat_added = self.Model.state1.h - self.Model.state4.h
+    self.Model.efficiency = 100.0 * (self.Model.turbine_work - self.Model.pump_work) / self.Model.heat_added
+    
+    return self.Model.efficiency
     def updateView(self):
         """
         This is a pass-through function that calls and identically named function in the View, but passes along the
